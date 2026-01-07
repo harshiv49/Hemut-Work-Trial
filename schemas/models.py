@@ -161,7 +161,6 @@ class Stop(BaseModel):
     order = relationship("Order", back_populates="stops")
     address = relationship("Address", back_populates="stops")
     stop_type = relationship("StopTypeModel", back_populates="stops")
-    tracking_events = relationship("TrackingEvent", back_populates="stop", cascade="all, delete-orphan")
 
 
 class Load(BaseModel):
@@ -187,13 +186,12 @@ class Quotation(BaseModel):
 
 # Example model - you can add more models here
 class TrackingEvent(BaseModel):
-    """Tracking events for order status updates with stop-level tracking."""
+    """Tracking events for order status updates."""
     
     __tablename__ = "tracking_events"
     
     order_id = Column(Integer, ForeignKey("orders.id"), index=True, nullable=False)
-    stop_id = Column(Integer, ForeignKey("stops.id"), index=True, nullable=True)  # Null for order-level events
-    status = Column(String, nullable=False, index=True)  # Stop-level: NOT_REACHED, ARRIVED, LOADING, UNLOADING, DEPARTED
+    status = Column(String, nullable=False, index=True)  # DEPARTED, IN_TRANSIT, ARRIVED, etc.
     location = Column(String, nullable=True)  # Current location
     description = Column(String, nullable=True)  # Additional details
     latitude = Column(Numeric(10, 7), nullable=True)
@@ -201,10 +199,9 @@ class TrackingEvent(BaseModel):
     timestamp = Column(DateTime(timezone=True), nullable=False)  # Event timestamp
     
     order = relationship("Order", back_populates="tracking_events")
-    stop = relationship("Stop", back_populates="tracking_events")
     
     def __repr__(self):
-        return f"<TrackingEvent(order_id={self.order_id}, stop_id={self.stop_id}, status='{self.status}', timestamp='{self.timestamp}')>"
+        return f"<TrackingEvent(order_id={self.order_id}, status='{self.status}', timestamp='{self.timestamp}')>"
 
 
 class LaneHistory(BaseModel):

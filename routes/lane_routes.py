@@ -61,7 +61,7 @@ async def get_lane_history(
     Returns most recent shipments first.
     """
     try:
-        # First find the lane
+        # First find the lane (use first() in case of duplicates)
         lane_result = await session.execute(
             select(Lane).where(
                 and_(
@@ -72,7 +72,7 @@ async def get_lane_history(
                 )
             )
         )
-        lane = lane_result.scalar_one_or_none()
+        lane = lane_result.scalars().first()
         
         if not lane:
             return []
@@ -134,12 +134,30 @@ async def get_lane_statistics(
     try:
         from datetime import datetime, timedelta
         
-        query_filter = and_(
-            func.upper(LaneHistory.origin_city) == origin_city.upper(),
-            func.upper(LaneHistory.origin_state) == origin_state.upper(),
-            func.upper(LaneHistory.dest_city) == dest_city.upper(),
-            func.upper(LaneHistory.dest_state) == dest_state.upper()
+        # First find the lane (use first() in case of duplicates)
+        lane_result = await session.execute(
+            select(Lane).where(
+                and_(
+                    func.upper(Lane.origin_city) == origin_city.upper(),
+                    func.upper(Lane.origin_state) == origin_state.upper(),
+                    func.upper(Lane.dest_city) == dest_city.upper(),
+                    func.upper(Lane.dest_state) == dest_state.upper()
+                )
+            )
         )
+        lane = lane_result.scalars().first()
+        
+        if not lane:
+            return LaneStatistics(
+                avg_rate=Decimal('0'),
+                min_rate=Decimal('0'),
+                max_rate=Decimal('0'),
+                avg_rate_per_mile=None,
+                total_shipments=0,
+                recent_shipments=0
+            )
+        
+        query_filter = LaneHistory.lane_id == lane.id
         
         if equipment_type:
             query_filter = and_(
@@ -150,9 +168,9 @@ async def get_lane_statistics(
         # Get overall statistics
         result = await session.execute(
             select(
-                func.avg(LaneHistory.rate).label('avg_rate'),
-                func.min(LaneHistory.rate).label('min_rate'),
-                func.max(LaneHistory.rate).label('max_rate'),
+                func.avg(LaneHistory.base_rate).label('avg_rate'),
+                func.min(LaneHistory.base_rate).label('min_rate'),
+                func.max(LaneHistory.base_rate).label('max_rate'),
                 func.avg(LaneHistory.rate_per_mile).label('avg_rate_per_mile'),
                 func.count(LaneHistory.id).label('total_shipments')
             ).where(query_filter)
@@ -167,7 +185,7 @@ async def get_lane_statistics(
             .where(
                 and_(
                     query_filter,
-                    LaneHistory.shipment_date >= thirty_days_ago
+                    LaneHistory.effective_date >= thirty_days_ago
                 )
             )
         )
