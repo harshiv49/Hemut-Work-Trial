@@ -86,6 +86,32 @@ class Address(BaseModel):
     stops = relationship("Stop", back_populates="address")
 
 
+class Lane(BaseModel):
+    """Shipping lanes representing routes between origin and destination cities."""
+    
+    __tablename__ = "lanes"
+    __table_args__ = (
+        UniqueConstraint("origin_city", "origin_state", "dest_city", "dest_state", name="uq_lanes_origin_dest"),
+        Index("ix_lanes_origin", "origin_city", "origin_state"),
+        Index("ix_lanes_dest", "dest_city", "dest_state"),
+    )
+    
+    origin_city = Column(String, nullable=False, index=True)
+    origin_state = Column(String, nullable=False, index=True)
+    dest_city = Column(String, nullable=False, index=True)
+    dest_state = Column(String, nullable=False, index=True)
+    
+    # Approximate distance (can be updated from route calculations)
+    miles = Column(Integer, nullable=True)
+    
+    # Relationships
+    orders = relationship("Order", back_populates="lane")
+    lane_history = relationship("LaneHistory", back_populates="lane", cascade="all, delete-orphan")
+    
+    def __repr__(self):
+        return f"<Lane({self.origin_city}, {self.origin_state} → {self.dest_city}, {self.dest_state})>"
+
+
 class Order(BaseModel):
     __tablename__ = "orders"
     __table_args__ = (
@@ -96,6 +122,11 @@ class Order(BaseModel):
     customer_id = Column(Integer, ForeignKey("customers.id"), index=True, nullable=False)
     equipment_type_id = Column(Integer, ForeignKey("equipment_types.id"), index=True, nullable=False)
     status_id = Column(Integer, ForeignKey("order_status_types.id"), index=True, nullable=False)
+    lane_id = Column(Integer, ForeignKey("lanes.id"), index=True, nullable=True)  # Assigned lane for pricing
+    
+    # Shipping dates (derived from stops but stored for easy access and querying)
+    pickup_date = Column(DateTime(timezone=True), nullable=True, index=True)
+    delivery_date = Column(DateTime(timezone=True), nullable=True, index=True)
     
     # Reference numbers
     bill_of_lading_number = Column(String, nullable=True)
@@ -107,9 +138,11 @@ class Order(BaseModel):
     customer = relationship("Customer", back_populates="orders")
     equipment_type = relationship("EquipmentType", back_populates="orders")
     status = relationship("OrderStatusType", back_populates="orders")
+    lane = relationship("Lane", back_populates="orders")
     stops = relationship("Stop", back_populates="order", cascade="all, delete-orphan")
     load = relationship("Load", back_populates="order", uselist=False, cascade="all, delete-orphan")
     quotation = relationship("Quotation", back_populates="order", uselist=False, cascade="all, delete-orphan")
+    tracking_events = relationship("TrackingEvent", back_populates="order", cascade="all, delete-orphan")
 
 
 class Stop(BaseModel):
@@ -128,6 +161,7 @@ class Stop(BaseModel):
     order = relationship("Order", back_populates="stops")
     address = relationship("Address", back_populates="stops")
     stop_type = relationship("StopTypeModel", back_populates="stops")
+    tracking_events = relationship("TrackingEvent", back_populates="stop", cascade="all, delete-orphan")
 
 
 class Load(BaseModel):
@@ -152,6 +186,62 @@ class Quotation(BaseModel):
 
 
 # Example model - you can add more models here
+class TrackingEvent(BaseModel):
+    """Tracking events for order status updates with stop-level tracking."""
+    
+    __tablename__ = "tracking_events"
+    
+    order_id = Column(Integer, ForeignKey("orders.id"), index=True, nullable=False)
+    stop_id = Column(Integer, ForeignKey("stops.id"), index=True, nullable=True)  # Null for order-level events
+    status = Column(String, nullable=False, index=True)  # Stop-level: NOT_REACHED, ARRIVED, LOADING, UNLOADING, DEPARTED
+    location = Column(String, nullable=True)  # Current location
+    description = Column(String, nullable=True)  # Additional details
+    latitude = Column(Numeric(10, 7), nullable=True)
+    longitude = Column(Numeric(10, 7), nullable=True)
+    timestamp = Column(DateTime(timezone=True), nullable=False)  # Event timestamp
+    
+    order = relationship("Order", back_populates="tracking_events")
+    stop = relationship("Stop", back_populates="tracking_events")
+    
+    def __repr__(self):
+        return f"<TrackingEvent(order_id={self.order_id}, stop_id={self.stop_id}, status='{self.status}', timestamp='{self.timestamp}')>"
+
+
+class LaneHistory(BaseModel):
+    """Historical pricing data for lanes - tracks rate changes over time."""
+    
+    __tablename__ = "lane_history"
+    __table_args__ = (
+        Index("ix_lane_history_lane_effective", "lane_id", "effective_date"),
+    )
+    
+    lane_id = Column(Integer, ForeignKey("lanes.id"), index=True, nullable=False)
+    order_id = Column(Integer, ForeignKey("orders.id"), index=True, nullable=True)  # Order that triggered this price
+    
+    # Pricing information
+    base_rate = Column(Numeric(12, 2), nullable=True)  # Base price for the lane (can be null if not yet calculated)
+    rate_per_mile = Column(Numeric(8, 2), nullable=True)  # Calculated rate per mile
+    
+    # Context for the pricing
+    equipment_type = Column(String, nullable=True)  # Van, Flatbed, etc.
+    weight_lbs = Column(Integer, nullable=True)
+    commodity = Column(String, nullable=True)
+    miles = Column(Integer, nullable=True)
+    
+    # Temporal information
+    effective_date = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    
+    # Additional metadata
+    carrier_name = Column(String, nullable=True)
+    notes = Column(String, nullable=True)
+    
+    # Relationships
+    lane = relationship("Lane", back_populates="lane_history")
+    
+    def __repr__(self):
+        return f"<LaneHistory(lane_id={self.lane_id}, base_rate=${self.base_rate}, effective_date={self.effective_date})>"
+
+
 class User(BaseModel):
     """Example User model with role field."""
     

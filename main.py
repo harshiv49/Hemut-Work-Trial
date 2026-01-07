@@ -8,6 +8,8 @@ from schemas import init_db
 from routes import user_router
 from routes.customer_routes import router as customer_router
 from routes.order_routes import router as order_router
+from routes.equipment_routes import router as equipment_router
+from routes.lane_routes import router as lane_router
 
 # Setup logging
 setup_logging()
@@ -58,6 +60,8 @@ app.add_exception_handler(Exception, global_exception_handler)
 app.include_router(user_router)
 app.include_router(customer_router)
 app.include_router(order_router)
+app.include_router(equipment_router)
+app.include_router(lane_router)
 
 
 @app.get("/", tags=["health"])

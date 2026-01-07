@@ -119,6 +119,11 @@ class OrderResponse(BaseModel):
     customer_id: int
     equipment_type_id: int
     status_id: int
+    pickup_date: Optional[datetime] = None
+    delivery_date: Optional[datetime] = None
+    bill_of_lading_number: Optional[str] = None
+    shipment_id: Optional[str] = None
+    bol_notes: Optional[str] = None
     customer: Optional[CustomerResponse] = None
     equipment_type: Optional[EquipmentTypeResponse] = None
     status: Optional[OrderStatusTypeResponse] = None
@@ -142,6 +147,13 @@ class OrderListResponse(BaseModel):
 
 class CustomerListResponse(BaseModel):
     customers: List[CustomerResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+class EquipmentTypeListResponse(BaseModel):
+    equipment_types: List[EquipmentTypeResponse]
     total: int
     skip: int
     limit: int

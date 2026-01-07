@@ -33,6 +33,29 @@ async def get_customers(
     )
 
 
+@router.get("/query", response_model=CustomerListResponse)
+async def search_customers(
+    q: str = Query(..., min_length=1, description="Search query (customer name)"),
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of records to return"),
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Search customers by name using full-text search.
+    
+    Returns:
+        - user_message: Friendly error message if search fails
+        - dev_message: Technical details for debugging
+    """
+    customers = await CustomerService.search_customers(session, query=q, skip=skip, limit=limit)
+    return CustomerListResponse(
+        customers=[CustomerResponse.model_validate(c) for c in customers],
+        total=len(customers),
+        skip=skip,
+        limit=limit
+    )
+
+
 @router.get("/{customer_id}", response_model=CustomerResponse)
 async def get_customer(
     customer_id: int,
