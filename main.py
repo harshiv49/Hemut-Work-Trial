@@ -6,6 +6,8 @@ from core.logging import setup_logging, get_logger
 from core.exceptions import global_exception_handler
 from schemas import init_db
 from routes import user_router
+from routes.customer_routes import router as customer_router
+from routes.order_routes import router as order_router
 
 # Setup logging
 setup_logging()
@@ -54,6 +56,8 @@ app.add_exception_handler(Exception, global_exception_handler)
 
 # Include routers
 app.include_router(user_router)
+app.include_router(customer_router)
+app.include_router(order_router)
 
 
 @app.get("/", tags=["health"])

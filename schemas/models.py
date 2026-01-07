@@ -3,6 +3,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
@@ -86,6 +87,10 @@ class Address(BaseModel):
 
 class Order(BaseModel):
     __tablename__ = "orders"
+    __table_args__ = (
+        # Descending index on created_at for efficient sorting in list views
+        Index("ix_orders_created_desc", "created_at", postgresql_using="btree", postgresql_ops={"created_at": "DESC"}),
+    )
 
     customer_id = Column(Integer, ForeignKey("customers.id"), index=True, nullable=False)
     equipment_type_id = Column(Integer, ForeignKey("equipment_types.id"), index=True, nullable=False)
