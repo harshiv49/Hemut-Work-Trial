@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from schemas.database import get_session
 from service.order_service import OrderService
 from routes.schemas import OrderResponse, OrderListResponse
+from routes.create_order_schemas import OrderCreate
 from typing import List, Optional
 import logging
 
@@ -118,4 +119,53 @@ async def get_orders_by_customer(
         skip=skip,
         limit=limit
     )
+
+
+@router.post("/", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
+async def create_order(
+    order_data: OrderCreate,
+    session: AsyncSession = Depends(get_session)
+):
+    """
+    Create a new order with stops, load, and quotation details.
+    
+    This endpoint creates an order atomically in a single transaction:
+    - Validates customer and equipment type
+    - Creates addresses for each stop
+    - Creates stops with proper sequencing
+    - Optionally creates load and quotation
+    - Sets initial status to CREATED
+    
+    Returns:
+        - user_message: Friendly error message if validation fails
+        - dev_message: Technical details for debugging
+    """
+    # Convert Pydantic models to dicts for service layer
+    stops_data = [
+        {
+            "stop_type": stop.stop_type,
+            "sequence_number": stop.sequence_number,
+            "scheduled_arrival_early": stop.scheduled_arrival_early,
+            "scheduled_arrival_late": stop.scheduled_arrival_late,
+            "address": stop.address.model_dump()
+        }
+        for stop in order_data.stops
+    ]
+    
+    load_data = order_data.load.model_dump() if order_data.load else None
+    quotation_data = order_data.quotation.model_dump() if order_data.quotation else None
+    
+    order = await OrderService.create_order(
+        session=session,
+        customer_id=order_data.customer_id,
+        equipment_type_id=order_data.equipment_type_id,
+        stops_data=stops_data,
+        load_data=load_data,
+        quotation_data=quotation_data,
+        bill_of_lading_number=order_data.bill_of_lading_number,
+        shipment_id=order_data.shipment_id,
+        bol_notes=order_data.bol_notes
+    )
+    
+    return OrderResponse.model_validate(order)
 

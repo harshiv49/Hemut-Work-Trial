@@ -75,6 +75,7 @@ class Address(BaseModel):
     __tablename__ = "addresses"
 
     location_name = Column(String, nullable=True)
+    location_id = Column(String, nullable=True)  # Auto-generated if empty
     street = Column(String, nullable=True)
     city = Column(String, index=True, nullable=True)
     state = Column(String, nullable=True)
@@ -95,6 +96,13 @@ class Order(BaseModel):
     customer_id = Column(Integer, ForeignKey("customers.id"), index=True, nullable=False)
     equipment_type_id = Column(Integer, ForeignKey("equipment_types.id"), index=True, nullable=False)
     status_id = Column(Integer, ForeignKey("order_status_types.id"), index=True, nullable=False)
+    
+    # Reference numbers
+    bill_of_lading_number = Column(String, nullable=True)
+    shipment_id = Column(String, nullable=True)
+    
+    # Notes
+    bol_notes = Column(String, nullable=True)
 
     customer = relationship("Customer", back_populates="orders")
     equipment_type = relationship("EquipmentType", back_populates="orders")
