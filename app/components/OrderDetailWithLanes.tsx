@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Order } from '../types/order';
-import LaneHistoryView from './LaneHistoryView';
+import LaneHistory from './LaneHistory';
 import LaneCalculator from './LaneCalculator';
 import { LaneCalculation } from '../types/lane';
 
@@ -129,13 +129,12 @@ export default function OrderDetailWithLanes({ order }: OrderDetailWithLanesProp
         )}
 
         {activeTab === 'lane-history' && originStop && destinationStop && (
-          <LaneHistoryView
+          <LaneHistory
             originCity={originStop.address?.city || ''}
             originState={originStop.address?.state || ''}
-            destinationCity={destinationStop.address?.city || ''}
-            destinationState={destinationStop.address?.state || ''}
-            equipmentType={order.equipment_type?.name || 'N/A'}
-            laneId={undefined} // TODO: Get from order.lane_id when implemented
+            destCity={destinationStop.address?.city || ''}
+            destState={destinationStop.address?.state || ''}
+            equipmentType={order.equipment_type?.name || ''}
           />
         )}
 
