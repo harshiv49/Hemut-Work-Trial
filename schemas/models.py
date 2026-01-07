@@ -161,6 +161,7 @@ class Stop(BaseModel):
     order = relationship("Order", back_populates="stops")
     address = relationship("Address", back_populates="stops")
     stop_type = relationship("StopTypeModel", back_populates="stops")
+    tracking_events = relationship("TrackingEvent", back_populates="stop")
 
 
 class Load(BaseModel):
@@ -191,6 +192,7 @@ class TrackingEvent(BaseModel):
     __tablename__ = "tracking_events"
     
     order_id = Column(Integer, ForeignKey("orders.id"), index=True, nullable=False)
+    stop_id = Column(Integer, ForeignKey("stops.id"), index=True, nullable=True)  # Optional: for stop-level tracking
     status = Column(String, nullable=False, index=True)  # DEPARTED, IN_TRANSIT, ARRIVED, etc.
     location = Column(String, nullable=True)  # Current location
     description = Column(String, nullable=True)  # Additional details
@@ -199,6 +201,7 @@ class TrackingEvent(BaseModel):
     timestamp = Column(DateTime(timezone=True), nullable=False)  # Event timestamp
     
     order = relationship("Order", back_populates="tracking_events")
+    stop = relationship("Stop", back_populates="tracking_events")
     
     def __repr__(self):
         return f"<TrackingEvent(order_id={self.order_id}, status='{self.status}', timestamp='{self.timestamp}')>"
