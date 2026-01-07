@@ -3,6 +3,7 @@
 import { useEffect, useImperativeHandle, forwardRef } from 'react';
 import useSWR from 'swr';
 import { OrderListResponse } from '../types/order';
+import { OrderFilters } from './FilterPanel';
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -16,6 +17,7 @@ interface OrdersListProps {
   initialData: OrderListResponse | null;
   refreshTrigger?: number;
   searchQuery?: string;
+  filters?: OrderFilters;
 }
 
 const OrdersList = forwardRef<OrdersListRef, OrdersListProps>(({ 
@@ -23,10 +25,42 @@ const OrdersList = forwardRef<OrdersListRef, OrdersListProps>(({
   selectedOrderId,
   initialData,
   refreshTrigger,
-  searchQuery = ''
+  searchQuery = '',
+  filters
 }, ref) => {
+  // Build query string with filters
+  const buildQueryString = () => {
+    const params = new URLSearchParams();
+    
+    if (filters) {
+      if (filters.statusIds.length > 0) {
+        params.append('status_ids', filters.statusIds.join(','));
+      }
+      if (filters.equipmentTypeIds.length > 0) {
+        params.append('equipment_type_ids', filters.equipmentTypeIds.join(','));
+      }
+      if (filters.pickupDateFrom) {
+        params.append('pickup_date_from', filters.pickupDateFrom);
+      }
+      if (filters.pickupDateTo) {
+        params.append('pickup_date_to', filters.pickupDateTo);
+      }
+      if (filters.deliveryDateFrom) {
+        params.append('delivery_date_from', filters.deliveryDateFrom);
+      }
+      if (filters.deliveryDateTo) {
+        params.append('delivery_date_to', filters.deliveryDateTo);
+      }
+    }
+    
+    const queryString = params.toString();
+    return queryString ? `?${queryString}` : '';
+  };
+
+  const apiUrl = `http://localhost:8000/orders/${buildQueryString()}`;
+
   const { data, error, isLoading, mutate } = useSWR<OrderListResponse>(
-    'http://localhost:8000/orders/',
+    apiUrl,
     fetcher,
     {
       fallbackData: initialData || undefined,
@@ -58,10 +92,10 @@ const OrdersList = forwardRef<OrdersListRef, OrdersListProps>(({
     }
   };
 
-  // Get pickup and delivery cities from stops
+  // Get pickup and delivery cities from stops with dates
   const getRouteCities = (order: any) => {
     if (!order.stops || order.stops.length === 0) {
-      return { pickup: null, delivery: null };
+      return { pickup: null, delivery: null, pickupDate: null, deliveryDate: null };
     }
 
     const sortedStops = [...order.stops].sort((a, b) => a.sequence_number - b.sequence_number);
@@ -74,8 +108,23 @@ const OrdersList = forwardRef<OrdersListRef, OrdersListProps>(({
         : null,
       delivery: deliveryStop?.address?.city && deliveryStop?.address?.state
         ? `${deliveryStop.address.city}, ${deliveryStop.address.state}`
-        : null
+        : null,
+      pickupDate: pickupStop?.scheduled_arrival_early || pickupStop?.scheduled_arrival_late,
+      deliveryDate: deliveryStop?.scheduled_arrival_early || deliveryStop?.scheduled_arrival_late
     };
+  };
+
+  // Format date to short format (e.g., "23 Apr")
+  const formatShortDate = (dateString: string | null) => {
+    if (!dateString) return '';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return '';
+    }
   };
 
   if (isLoading) {
@@ -120,10 +169,10 @@ const OrdersList = forwardRef<OrdersListRef, OrdersListProps>(({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="p-5 border-b border-border">
+      <div className="p-3 sm:p-5 border-b border-border">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs sm:text-sm text-muted-foreground">
               Showing {orders.length} of {total} orders
             </p>
           </div>
@@ -142,19 +191,19 @@ const OrdersList = forwardRef<OrdersListRef, OrdersListProps>(({
 
       <div className="flex-1 overflow-y-auto scrollbar-hide">
         {orders.length === 0 ? (
-          <div className="p-8 text-center">
+          <div className="p-6 sm:p-8 text-center">
             <p className="text-muted-foreground">No orders found</p>
           </div>
         ) : (
-          <div className="p-3 space-y-3">
+          <div className="p-2 sm:p-3 space-y-2 sm:space-y-3">
             {orders.map((order) => {
-              const { pickup, delivery } = getRouteCities(order);
+              const { pickup, delivery, pickupDate, deliveryDate } = getRouteCities(order);
               const isSelected = selectedOrderId === order.id;
               return (
                 <div
                   key={order.id}
                   onClick={() => onOrderSelect(order.id)}
-                  className={`p-4 rounded-lg cursor-pointer transition-all border-l-4 ${
+                  className={`p-3 sm:p-4 rounded-lg cursor-pointer transition-all border-l-4 ${
                     isSelected
                       ? 'bg-[#F4B223]/5 border-[#F4B223] shadow-sm'
                       : 'bg-card border-transparent hover:bg-accent hover:shadow-sm'
@@ -187,31 +236,53 @@ const OrdersList = forwardRef<OrdersListRef, OrdersListProps>(({
                     </div>
                   </div>
                   
+                  {/* Customer Name */}
+                  {order.customer && (
+                    <div className="text-xs text-muted-foreground mb-2">
+                      {order.customer.name}
+                    </div>
+                  )}
+
                   {order.equipment_type && (
                     <div className="text-sm font-medium text-foreground mb-3">
                       {order.equipment_type.name}
                     </div>
                   )}
 
-                  {/* Route Information */}
+                  {/* Route Information with connecting line */}
                   {(pickup || delivery) && (
-                    <div className="space-y-2 text-xs">
-                      <div className="flex items-start gap-2">
-                        <span className="text-muted-foreground mt-0.5">23 Apr</span>
-                        <div className="flex items-center gap-1">
-                          <svg className="w-3 h-3 text-foreground" fill="currentColor" viewBox="0 0 20 20">
-                            <circle cx="10" cy="10" r="3" />
-                          </svg>
-                          <span className="text-foreground font-medium">{pickup || 'N/A'}</span>
+                    <div className="relative">
+                      <div className="space-y-1 text-xs">
+                        {/* Pickup */}
+                        <div className="flex items-start gap-2">
+                          <span className="text-muted-foreground mt-0.5 w-12 flex-shrink-0">
+                            {formatShortDate(pickupDate) || 'TBD'}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <svg className="w-3 h-3 text-foreground flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <circle cx="10" cy="10" r="3" />
+                            </svg>
+                            <span className="text-foreground font-medium">{pickup || 'N/A'}</span>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <span className="text-muted-foreground mt-0.5">25 Apr</span>
-                        <div className="flex items-center gap-1">
-                          <svg className="w-3 h-3 text-foreground" fill="currentColor" viewBox="0 0 20 20">
-                            <circle cx="10" cy="10" r="3" />
-                          </svg>
-                          <span className="text-foreground font-medium">{delivery || 'N/A'}</span>
+                        
+                        {/* Connecting line */}
+                        <div className="flex items-center gap-2">
+                          <div className="w-12 flex-shrink-0"></div>
+                          <div className="border-l-2 border-dashed border-[#F4B223]/40 h-3 ml-[5px]"></div>
+                        </div>
+
+                        {/* Delivery */}
+                        <div className="flex items-start gap-2">
+                          <span className="text-muted-foreground mt-0.5 w-12 flex-shrink-0">
+                            {formatShortDate(deliveryDate) || 'TBD'}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <svg className="w-3 h-3 text-foreground flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <circle cx="10" cy="10" r="3" />
+                            </svg>
+                            <span className="text-foreground font-medium">{delivery || 'N/A'}</span>
+                          </div>
                         </div>
                       </div>
                     </div>

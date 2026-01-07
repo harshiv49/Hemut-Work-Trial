@@ -142,18 +142,25 @@ export default function MapView({ order }: { order: Order }) {
   });
 
   return (
-    <div className="relative w-full h-full">
-      {loading && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[1000] px-4 py-2 bg-blue-500 text-white text-sm rounded-lg shadow-lg">
-          Loading route...
-        </div>
-      )}
-      {error && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[1000] px-4 py-2 bg-orange-500 text-white text-xs rounded-lg shadow-lg">
-          {error}
-        </div>
-      )}
-      <MapContainer
+    <div className="relative w-full h-full flex flex-col">
+      {/* Map Heading */}
+      <div className="bg-card border-b border-border px-6 py-3 flex-shrink-0">
+        <h3 className="text-sm font-semibold text-foreground">Route Map</h3>
+      </div>
+
+      {/* Map Container */}
+      <div className="relative flex-1">
+        {loading && (
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[1000] px-4 py-2 bg-blue-500 text-white text-sm rounded-lg shadow-lg">
+            Loading route...
+          </div>
+        )}
+        {error && (
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[1000] px-4 py-2 bg-orange-500 text-white text-xs rounded-lg shadow-lg">
+            {error}
+          </div>
+        )}
+        <MapContainer
         center={[centerLat, centerLng]}
         zoom={6}
         style={{ height: '100%', width: '100%' }}
@@ -198,7 +205,8 @@ export default function MapView({ order }: { order: Order }) {
             </Popup>
           </Marker>
         ))}
-      </MapContainer>
+        </MapContainer>
+      </div>
     </div>
   );
 }

@@ -10,7 +10,7 @@ const urbanist = Urbanist({
 });
 
 export const metadata: Metadata = {
-  title: "Uniglobe - Freight TMS",
+  title: "Hemut - Freight TMS",
   description: "Transportation Management System",
 };
 

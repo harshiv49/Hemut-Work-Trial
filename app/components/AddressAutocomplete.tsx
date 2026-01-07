@@ -75,19 +75,27 @@ export default function AddressAutocomplete({
       if (response.ok) {
         const data = await response.json();
         
-        const parsedSuggestions: AddressSuggestion[] = data.map((item: any) => {
-          const addr = item.address || {};
-          
-          return {
-            display: item.display_name,
-            street: addr.road || addr.street || '',
-            city: addr.city || addr.town || addr.village || '',
-            state: addr.state || '',
-            zip: addr.postcode || '',
-            lat: parseFloat(item.lat),
-            lng: parseFloat(item.lon),
-          };
-        });
+        const parsedSuggestions: AddressSuggestion[] = data
+          .map((item: any) => {
+            const addr = item.address || {};
+            
+            return {
+              display: item.display_name,
+              street: addr.road || addr.street || '',
+              city: addr.city || addr.town || addr.village || '',
+              state: addr.state || '',
+              zip: addr.postcode || '',
+              lat: parseFloat(item.lat),
+              lng: parseFloat(item.lon),
+            };
+          })
+          // Only show addresses with ALL required fields (street, city, state, zip)
+          .filter(suggestion => 
+            suggestion.street && 
+            suggestion.city && 
+            suggestion.state && 
+            suggestion.zip
+          );
 
         setSuggestions(parsedSuggestions);
         setShowSuggestions(true);
@@ -121,6 +129,13 @@ export default function AddressAutocomplete({
   }, [searchQuery]);
 
   const handleSelectSuggestion = (suggestion: AddressSuggestion) => {
+    // Validate that we have all required fields
+    if (!suggestion.street || !suggestion.city || !suggestion.state || !suggestion.zip) {
+      console.error('Incomplete address selected:', suggestion);
+      alert('This address is missing required information (street, city, state, or zip code). Please enter the details manually.');
+      return;
+    }
+
     // Extract state abbreviation if we have a full state name
     const stateAbbr = getStateAbbreviation(suggestion.state);
     
@@ -161,7 +176,7 @@ export default function AddressAutocomplete({
 
   return (
     <div className="relative">
-      <label className="block text-xs font-medium text-gray-700 mb-1">
+      <label className="block text-xs font-medium text-foreground mb-1">
         🔍 Search Address (Optional) {required && <span className="text-red-500">*</span>}
       </label>
       <div className="relative">
@@ -175,16 +190,16 @@ export default function AddressAutocomplete({
               setShowSuggestions(true);
             }
           }}
-          className="w-full px-3 py-2 pl-9 border border-blue-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 bg-blue-50"
+          className="w-full px-3 py-2 pl-9 border border-border rounded-lg text-sm focus:ring-2 focus:ring-[#F4B223] bg-accent/50 text-foreground placeholder:text-muted-foreground"
         />
         <div className="absolute left-2 top-2">
           {isLoading ? (
-            <svg className="animate-spin h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24">
+            <svg className="animate-spin h-5 w-5 text-[#F4B223]" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
           ) : (
-            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-[#F4B223]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           )}
@@ -192,38 +207,43 @@ export default function AddressAutocomplete({
       </div>
       
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto border-2 border-blue-300 rounded-lg bg-white shadow-xl">
+        <div className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto border border-border rounded-lg bg-card shadow-xl">
           {suggestions.map((suggestion, idx) => (
             <button
               key={idx}
               type="button"
               onClick={() => handleSelectSuggestion(suggestion)}
-              className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm border-b border-gray-100 last:border-b-0 transition-colors"
+              className="w-full text-left px-3 py-2 hover:bg-accent text-sm border-b border-border last:border-b-0 transition-colors"
             >
-              <div className="font-medium text-gray-900 flex items-center gap-2">
-                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="font-medium text-foreground flex items-center gap-2">
+                <svg className="w-4 h-4 text-[#F4B223] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                {suggestion.display}
+                <span className="truncate">{suggestion.display}</span>
               </div>
-              {suggestion.street && (
-                <div className="text-xs text-gray-500 ml-6">
-                  {suggestion.street}, {suggestion.city}, {suggestion.state} {suggestion.zip}
-                </div>
-              )}
+              <div className="text-xs text-muted-foreground ml-6 mt-1">
+                <div>📍 {suggestion.street}</div>
+                <div>🏙️ {suggestion.city}, {suggestion.state} {suggestion.zip}</div>
+                <div className="text-green-600 dark:text-green-400 mt-0.5">✓ All fields will be auto-filled</div>
+              </div>
             </button>
           ))}
         </div>
       )}
       
       {searchQuery.length > 0 && searchQuery.length < 3 && (
-        <p className="text-xs text-blue-600 mt-1">Type at least 3 characters to search</p>
+        <p className="text-xs text-muted-foreground mt-1">Type at least 3 characters to search</p>
       )}
       
       {showSuggestions && suggestions.length === 0 && !isLoading && searchQuery.length >= 3 && (
-        <div className="absolute z-20 mt-1 w-full border border-gray-200 rounded-lg bg-white shadow-lg p-3">
-          <p className="text-sm text-gray-500">No addresses found. Try a different search.</p>
+        <div className="absolute z-20 mt-1 w-full border border-border rounded-lg bg-card shadow-lg p-3">
+          <p className="text-sm text-muted-foreground">
+            No complete addresses found with all required fields (street, city, state, zip code).
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            💡 Try a more specific search or enter the address manually below.
+          </p>
         </div>
       )}
     </div>

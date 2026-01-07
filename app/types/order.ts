@@ -74,6 +74,20 @@ export interface OrderStatus {
   updated_at: string;
 }
 
+export interface TrackingEvent {
+  id: number;
+  order_id: number;
+  stop_id: number | null;
+  status: string;
+  location: string | null;
+  description: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  timestamp: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Order {
   id: number;
   customer_id: number;
@@ -85,6 +99,7 @@ export interface Order {
   stops: Stop[] | null;
   load: Load | null;
   quotation: Quotation | null;
+  tracking_events?: TrackingEvent[] | null;
   created_at: string;
   updated_at: string;
 }
