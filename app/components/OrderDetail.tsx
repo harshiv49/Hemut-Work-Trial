@@ -21,6 +21,7 @@ type TabType = 'load' | 'customer' | 'map';
 
 export default function OrderDetail({ orderId }: { orderId: number | null }) {
   const [activeTab, setActiveTab] = useState<TabType>('load');
+  const [showMap, setShowMap] = useState(false);
 
   const { data: order, error, isLoading } = useSWR<Order>(
     orderId ? `http://localhost:8000/orders/${orderId}` : null,
@@ -29,6 +30,34 @@ export default function OrderDetail({ orderId }: { orderId: number | null }) {
       revalidateOnFocus: true,
     }
   );
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'Not specified';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const formatDateTime = (dateString: string | null) => {
+    if (!dateString) return 'Not specified';
+    try {
+      return new Date(dateString).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return dateString;
+    }
+  };
 
   if (!orderId) {
     return (
@@ -68,88 +97,60 @@ export default function OrderDetail({ orderId }: { orderId: number | null }) {
     );
   }
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'Not specified';
-    try {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch {
-      return dateString;
-    }
-  };
-
-  const formatDateTime = (dateString: string | null) => {
-    if (!dateString) return 'Not specified';
-    try {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      });
-    } catch {
-      return dateString;
-    }
-  };
-
   return (
     <div className="h-full flex flex-col">
-      {/* Map Section */}
-      <div className="h-80 bg-card border-b border-border">
-        <MapView order={order} />
-      </div>
-
       {/* Tabs */}
       <div className="border-b border-border bg-card">
-        <div className="flex px-6">
+        <div className="flex px-6 justify-between items-center">
+          <div className="flex">
+            <button
+              onClick={() => setActiveTab('load')}
+              className={`px-4 py-4 font-medium text-sm transition-colors relative ${
+                activeTab === 'load'
+                  ? 'text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Order details
+              {activeTab === 'load' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#F4B223]"></div>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('customer')}
+              className={`px-4 py-4 font-medium text-sm transition-colors relative ${
+                activeTab === 'customer'
+                  ? 'text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Customer information
+              {activeTab === 'customer' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#F4B223]"></div>
+              )}
+            </button>
+          </div>
+          
+          {/* Map Toggle Button */}
           <button
-            onClick={() => setActiveTab('load')}
-            className={`px-4 py-4 font-medium text-sm transition-colors relative ${
-              activeTab === 'load'
-                ? 'text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
+            onClick={() => setShowMap(!showMap)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+              showMap 
+                ? 'bg-[#F4B223] text-gray-900' 
+                : 'bg-muted hover:bg-muted/80 text-foreground'
             }`}
           >
-            Order details
-            {activeTab === 'load' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"></div>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('customer')}
-            className={`px-4 py-4 font-medium text-sm transition-colors relative ${
-              activeTab === 'customer'
-                ? 'text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Driver information
-            {activeTab === 'customer' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"></div>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('map')}
-            className={`px-4 py-4 font-medium text-sm transition-colors relative ${
-              activeTab === 'map'
-                ? 'text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            Vehicle
-            {activeTab === 'map' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary"></div>
-            )}
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+            </svg>
+            {showMap ? 'Hide Map' : 'Show Map'}
           </button>
         </div>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto scrollbar-hide p-6 bg-card">
+      <div className="flex-1 overflow-y-auto scrollbar-hide flex flex-col">
+        <div className={`p-6 bg-card ${showMap ? 'flex-1' : 'h-full'} overflow-y-auto`}>
         {activeTab === 'load' && (
           <div className="space-y-6">
             <div className="bg-background rounded-lg border border-border p-5">
@@ -198,7 +199,7 @@ export default function OrderDetail({ orderId }: { orderId: number | null }) {
 
               <div className="bg-background rounded-lg border border-border p-5">
                 <label className="text-xs font-medium text-muted-foreground block mb-2">Accessorials</label>
-                <span className="inline-flex px-3 py-1 bg-primary/10 text-primary text-xs font-medium rounded-full">
+                <span className="inline-flex px-3 py-1 bg-[#F4B223]/10 text-[#D69E1F] text-xs font-medium rounded-full">
                   DRIVER_ASSIST
                 </span>
               </div>
@@ -221,8 +222,8 @@ export default function OrderDetail({ orderId }: { orderId: number | null }) {
                           <div className="flex flex-col items-center">
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold ${
                               stop.stop_type?.name === 'PICKUP' 
-                                ? 'bg-primary/20 text-primary' 
-                                : 'bg-blue-500/20 text-blue-600 dark:text-blue-400'
+                                ? 'bg-[#F4B223]/20 text-[#D69E1F]' 
+                                : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400'
                             }`}>
                               {index + 1}
                             </div>
@@ -294,8 +295,8 @@ export default function OrderDetail({ orderId }: { orderId: number | null }) {
               <>
                 <div className="bg-background rounded-lg border border-border p-5">
                   <div className="flex items-center gap-4 mb-5">
-                    <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center">
-                      <span className="text-xl font-bold text-primary">
+                    <div className="w-16 h-16 rounded-full bg-[#F4B223]/20 flex items-center justify-center">
+                      <span className="text-xl font-bold text-[#D69E1F]">
                         {order.customer.name.split(' ').map(n => n[0]).join('')}
                       </span>
                     </div>
@@ -352,9 +353,12 @@ export default function OrderDetail({ orderId }: { orderId: number | null }) {
           </div>
         )}
 
-        {activeTab === 'map' && (
-          <div className="text-center text-muted-foreground py-12">
-            <p>Vehicle information would be displayed here</p>
+        </div>
+
+        {/* Toggleable Map at Bottom */}
+        {showMap && (
+          <div className="h-96 bg-card border-t border-border flex-shrink-0">
+            <MapView order={order} />
           </div>
         )}
       </div>

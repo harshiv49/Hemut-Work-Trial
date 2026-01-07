@@ -15,13 +15,15 @@ interface OrdersListProps {
   selectedOrderId: number | null;
   initialData: OrderListResponse | null;
   refreshTrigger?: number;
+  searchQuery?: string;
 }
 
 const OrdersList = forwardRef<OrdersListRef, OrdersListProps>(({ 
   onOrderSelect,
   selectedOrderId,
   initialData,
-  refreshTrigger
+  refreshTrigger,
+  searchQuery = ''
 }, ref) => {
   const { data, error, isLoading, mutate } = useSWR<OrderListResponse>(
     'http://localhost:8000/orders/',
@@ -101,8 +103,20 @@ const OrdersList = forwardRef<OrdersListRef, OrdersListProps>(({
     );
   }
 
-  const orders = data?.orders || [];
+  const allOrders = data?.orders || [];
   const total = data?.total || 0;
+  
+  // Filter orders based on search query
+  const orders = allOrders.filter((order) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      order.id.toString().includes(query) ||
+      order.customer?.name.toLowerCase().includes(query) ||
+      order.equipment_type?.name.toLowerCase().includes(query) ||
+      order.status?.name.toLowerCase().includes(query)
+    );
+  });
 
   return (
     <div className="h-full flex flex-col">
@@ -142,7 +156,7 @@ const OrdersList = forwardRef<OrdersListRef, OrdersListProps>(({
                   onClick={() => onOrderSelect(order.id)}
                   className={`p-4 rounded-lg cursor-pointer transition-all border-l-4 ${
                     isSelected
-                      ? 'bg-primary/5 border-primary shadow-sm'
+                      ? 'bg-[#F4B223]/5 border-[#F4B223] shadow-sm'
                       : 'bg-card border-transparent hover:bg-accent hover:shadow-sm'
                   }`}
                 >
@@ -154,13 +168,13 @@ const OrdersList = forwardRef<OrdersListRef, OrdersListProps>(({
                       <span
                         className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${
                           order.status?.name === 'CREATED'
-                            ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                            ? 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
                             : order.status?.name === 'QUOTED'
-                            ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                            ? 'bg-[#F4B223]/10 text-[#D69E1F]'
                             : order.status?.name === 'BOOKED'
                             ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400'
                             : order.status?.name === 'IN_TRANSIT'
-                            ? 'bg-primary/10 text-primary'
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                             : order.status?.name === 'COMPLETED'
                             ? 'bg-gray-500/10 text-gray-600 dark:text-gray-400'
                             : 'bg-gray-500/10 text-gray-600 dark:text-gray-400'
