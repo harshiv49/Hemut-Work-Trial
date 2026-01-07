@@ -56,6 +56,26 @@ const OrdersList = forwardRef<OrdersListRef, OrdersListProps>(({
     }
   };
 
+  // Get pickup and delivery cities from stops
+  const getRouteCities = (order: any) => {
+    if (!order.stops || order.stops.length === 0) {
+      return { pickup: null, delivery: null };
+    }
+
+    const sortedStops = [...order.stops].sort((a, b) => a.sequence_number - b.sequence_number);
+    const pickupStop = sortedStops.find((stop: any) => stop.stop_type?.name === 'PICKUP');
+    const deliveryStop = sortedStops.reverse().find((stop: any) => stop.stop_type?.name === 'DROP');
+
+    return {
+      pickup: pickupStop?.address?.city && pickupStop?.address?.state 
+        ? `${pickupStop.address.city}, ${pickupStop.address.state}`
+        : null,
+      delivery: deliveryStop?.address?.city && deliveryStop?.address?.state
+        ? `${deliveryStop.address.city}, ${deliveryStop.address.state}`
+        : null
+    };
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -85,87 +105,106 @@ const OrdersList = forwardRef<OrdersListRef, OrdersListProps>(({
   const total = data?.total || 0;
 
   return (
-    <div className="h-full flex flex-col bg-white">
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center justify-between mb-4">
+    <div className="h-full flex flex-col">
+      <div className="p-5 border-b border-border">
+        <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Orders</h2>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-muted-foreground">
               Showing {orders.length} of {total} orders
             </p>
           </div>
           <button
             onClick={() => mutate()}
             disabled={isLoading}
-            className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed text-sm"
+            className="p-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Refresh orders"
           >
-            {isLoading ? 'Refreshing...' : 'Refresh'}
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
           </button>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto scrollbar-hide">
         {orders.length === 0 ? (
           <div className="p-8 text-center">
-            <p className="text-gray-600">No orders found</p>
+            <p className="text-muted-foreground">No orders found</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-200">
-            {orders.map((order) => (
-              <div
-                key={order.id}
-                onClick={() => onOrderSelect(order.id)}
-                className={`p-4 cursor-pointer transition-colors ${
-                  selectedOrderId === order.id
-                    ? 'bg-yellow-50 border-l-4 border-yellow-500'
-                    : 'hover:bg-gray-50'
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="font-semibold text-gray-900">
-                        Order #{order.id}
+          <div className="p-3 space-y-3">
+            {orders.map((order) => {
+              const { pickup, delivery } = getRouteCities(order);
+              const isSelected = selectedOrderId === order.id;
+              return (
+                <div
+                  key={order.id}
+                  onClick={() => onOrderSelect(order.id)}
+                  className={`p-4 rounded-lg cursor-pointer transition-all border-l-4 ${
+                    isSelected
+                      ? 'bg-primary/5 border-primary shadow-sm'
+                      : 'bg-card border-transparent hover:bg-accent hover:shadow-sm'
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-foreground">
+                        ID {order.id}
                       </span>
-                      {order.customer && (
-                        <span className="text-gray-600">• {order.customer.name}</span>
-                      )}
-                    </div>
-                    {order.equipment_type && (
-                      <div className="text-sm text-gray-600 mb-1">
-                        {order.equipment_type.name}
-                        {order.equipment_type.description && (
-                          <span className="text-gray-500">
-                            {' / '}
-                            {order.equipment_type.description}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
                       <span
-                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${
                           order.status?.name === 'CREATED'
-                            ? 'bg-blue-100 text-blue-800'
+                            ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
                             : order.status?.name === 'QUOTED'
-                            ? 'bg-green-100 text-green-800'
+                            ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
                             : order.status?.name === 'BOOKED'
-                            ? 'bg-purple-100 text-purple-800'
+                            ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400'
                             : order.status?.name === 'IN_TRANSIT'
-                            ? 'bg-yellow-100 text-yellow-800'
+                            ? 'bg-primary/10 text-primary'
                             : order.status?.name === 'COMPLETED'
-                            ? 'bg-gray-100 text-gray-800'
-                            : 'bg-gray-100 text-gray-800'
+                            ? 'bg-gray-500/10 text-gray-600 dark:text-gray-400'
+                            : 'bg-gray-500/10 text-gray-600 dark:text-gray-400'
                         }`}
                       >
-                        {order.status?.name || 'Unknown'}
+                        {order.status?.name === 'IN_TRANSIT' ? 'In transit' : 
+                         order.status?.name === 'CREATED' ? 'No connection' : 
+                         order.status?.name?.replace(/_/g, ' ').toLowerCase() || 'Unknown'}
                       </span>
-                      <span>{formatDate(order.created_at)}</span>
                     </div>
                   </div>
+                  
+                  {order.equipment_type && (
+                    <div className="text-sm font-medium text-foreground mb-3">
+                      {order.equipment_type.name}
+                    </div>
+                  )}
+
+                  {/* Route Information */}
+                  {(pickup || delivery) && (
+                    <div className="space-y-2 text-xs">
+                      <div className="flex items-start gap-2">
+                        <span className="text-muted-foreground mt-0.5">23 Apr</span>
+                        <div className="flex items-center gap-1">
+                          <svg className="w-3 h-3 text-foreground" fill="currentColor" viewBox="0 0 20 20">
+                            <circle cx="10" cy="10" r="3" />
+                          </svg>
+                          <span className="text-foreground font-medium">{pickup || 'N/A'}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-muted-foreground mt-0.5">25 Apr</span>
+                        <div className="flex items-center gap-1">
+                          <svg className="w-3 h-3 text-foreground" fill="currentColor" viewBox="0 0 20 20">
+                            <circle cx="10" cy="10" r="3" />
+                          </svg>
+                          <span className="text-foreground font-medium">{delivery || 'N/A'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

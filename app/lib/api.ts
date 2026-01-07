@@ -57,6 +57,22 @@ export async function fetchCustomers() {
   return response.json();
 }
 
+export async function searchCustomers(query: string) {
+  if (!query.trim()) {
+    return { customers: [], total: 0, skip: 0, limit: 100 };
+  }
+  
+  const response = await fetch(`${API_BASE_URL}/customers/query?q=${encodeURIComponent(query)}`, {
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to search customers');
+  }
+
+  return response.json();
+}
+
 export async function fetchEquipmentTypes() {
   const response = await fetch(`${API_BASE_URL}/equipment-types/`, {
     next: { revalidate: 60 },
@@ -64,6 +80,22 @@ export async function fetchEquipmentTypes() {
 
   if (!response.ok) {
     throw new Error('Failed to fetch equipment types');
+  }
+
+  return response.json();
+}
+
+export async function searchEquipmentTypes(query: string) {
+  if (!query.trim()) {
+    return { equipment_types: [], total: 0, skip: 0, limit: 100 };
+  }
+  
+  const response = await fetch(`${API_BASE_URL}/equipment-types/query?q=${encodeURIComponent(query)}`, {
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to search equipment types');
   }
 
   return response.json();

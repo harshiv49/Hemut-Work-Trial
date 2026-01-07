@@ -1,9 +1,65 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { OrderFormData, StopFormData, AddressFormData, Customer, EquipmentType } from '../types/create-order';
 import RouteMapPreview from './RouteMapPreview';
-import { createOrder, fetchCustomers, fetchEquipmentTypes } from '../lib/api';
+import AddressAutocomplete from './AddressAutocomplete';
+import { createOrder, searchCustomers, searchEquipmentTypes } from '../lib/api';
+
+// US States for dropdown
+const US_STATES = [
+  { code: 'AL', name: 'Alabama' },
+  { code: 'AK', name: 'Alaska' },
+  { code: 'AZ', name: 'Arizona' },
+  { code: 'AR', name: 'Arkansas' },
+  { code: 'CA', name: 'California' },
+  { code: 'CO', name: 'Colorado' },
+  { code: 'CT', name: 'Connecticut' },
+  { code: 'DE', name: 'Delaware' },
+  { code: 'FL', name: 'Florida' },
+  { code: 'GA', name: 'Georgia' },
+  { code: 'HI', name: 'Hawaii' },
+  { code: 'ID', name: 'Idaho' },
+  { code: 'IL', name: 'Illinois' },
+  { code: 'IN', name: 'Indiana' },
+  { code: 'IA', name: 'Iowa' },
+  { code: 'KS', name: 'Kansas' },
+  { code: 'KY', name: 'Kentucky' },
+  { code: 'LA', name: 'Louisiana' },
+  { code: 'ME', name: 'Maine' },
+  { code: 'MD', name: 'Maryland' },
+  { code: 'MA', name: 'Massachusetts' },
+  { code: 'MI', name: 'Michigan' },
+  { code: 'MN', name: 'Minnesota' },
+  { code: 'MS', name: 'Mississippi' },
+  { code: 'MO', name: 'Missouri' },
+  { code: 'MT', name: 'Montana' },
+  { code: 'NE', name: 'Nebraska' },
+  { code: 'NV', name: 'Nevada' },
+  { code: 'NH', name: 'New Hampshire' },
+  { code: 'NJ', name: 'New Jersey' },
+  { code: 'NM', name: 'New Mexico' },
+  { code: 'NY', name: 'New York' },
+  { code: 'NC', name: 'North Carolina' },
+  { code: 'ND', name: 'North Dakota' },
+  { code: 'OH', name: 'Ohio' },
+  { code: 'OK', name: 'Oklahoma' },
+  { code: 'OR', name: 'Oregon' },
+  { code: 'PA', name: 'Pennsylvania' },
+  { code: 'RI', name: 'Rhode Island' },
+  { code: 'SC', name: 'South Carolina' },
+  { code: 'SD', name: 'South Dakota' },
+  { code: 'TN', name: 'Tennessee' },
+  { code: 'TX', name: 'Texas' },
+  { code: 'UT', name: 'Utah' },
+  { code: 'VT', name: 'Vermont' },
+  { code: 'VA', name: 'Virginia' },
+  { code: 'WA', name: 'Washington' },
+  { code: 'WV', name: 'West Virginia' },
+  { code: 'WI', name: 'Wisconsin' },
+  { code: 'WY', name: 'Wyoming' },
+  { code: 'DC', name: 'District of Columbia' },
+];
 
 interface CreateOrderFormProps {
   onClose: () => void;
@@ -42,26 +98,92 @@ export default function CreateOrderForm({ onClose, onSuccess }: CreateOrderFormP
   const [error, setError] = useState<string | null>(null);
   const [searchCustomer, setSearchCustomer] = useState('');
   const [searchEquipment, setSearchEquipment] = useState('');
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [showEquipmentDropdown, setShowEquipmentDropdown] = useState(false);
+  const [selectedCustomerName, setSelectedCustomerName] = useState('');
+  const [selectedEquipmentName, setSelectedEquipmentName] = useState('');
+  const [zipLookupLoading, setZipLookupLoading] = useState<{ [key: number]: boolean }>({});
 
-  // Fetch customers and equipment types
+  // Debounced search for customers
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [customersData, equipmentData] = await Promise.all([
-          fetchCustomers(),
-          fetchEquipmentTypes(),
-        ]);
-
-        setCustomers(customersData.customers || []);
-        setEquipmentTypes(equipmentData.equipment_types || []);
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('Failed to load customers or equipment types');
+    const timer = setTimeout(async () => {
+      if (searchCustomer.trim().length >= 2) {
+        try {
+          const data = await searchCustomers(searchCustomer);
+          setCustomers(data.customers || []);
+          setShowCustomerDropdown(true);
+        } catch (err) {
+          console.error('Error searching customers:', err);
+        }
+      } else {
+        setCustomers([]);
+        setShowCustomerDropdown(false);
       }
-    };
+    }, 300);
 
-    fetchData();
-  }, []);
+    return () => clearTimeout(timer);
+  }, [searchCustomer]);
+
+  // Debounced search for equipment types
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      if (searchEquipment.trim().length >= 2) {
+        try {
+          const data = await searchEquipmentTypes(searchEquipment);
+          setEquipmentTypes(data.equipment_types || []);
+          setShowEquipmentDropdown(true);
+        } catch (err) {
+          console.error('Error searching equipment types:', err);
+        }
+      } else {
+        setEquipmentTypes([]);
+        setShowEquipmentDropdown(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchEquipment]);
+
+  // Lookup city and state from ZIP code
+  const lookupZipCode = async (stopIndex: number, zipCode: string) => {
+    // Clean the ZIP code (remove spaces, dashes, etc.)
+    const cleanZip = zipCode.replace(/[^0-9]/g, '');
+    
+    // Only lookup if we have a 5-digit ZIP
+    if (cleanZip.length !== 5) {
+      return;
+    }
+
+    setZipLookupLoading({ ...zipLookupLoading, [stopIndex]: true });
+
+    try {
+      // Using Zippopotam.us API (free, no API key required)
+      const response = await fetch(`https://api.zippopotam.us/us/${cleanZip}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        if (data.places && data.places.length > 0) {
+          const place = data.places[0];
+          
+          // Update city and state
+          const newStops = [...formData.stops];
+          newStops[stopIndex].address = {
+            ...newStops[stopIndex].address,
+            city: place['place name'],
+            state: place['state abbreviation'],
+            latitude: parseFloat(place.latitude),
+            longitude: parseFloat(place.longitude),
+          };
+          setFormData({ ...formData, stops: newStops });
+        }
+      }
+    } catch (error) {
+      console.error('Error looking up ZIP code:', error);
+    } finally {
+      setZipLookupLoading({ ...zipLookupLoading, [stopIndex]: false });
+    }
+  };
 
   const addStop = () => {
     const newStop: StopFormData = {
@@ -103,6 +225,12 @@ export default function CreateOrderForm({ onClose, onSuccess }: CreateOrderFormP
   const updateStopAddress = (stopIndex: number, field: keyof AddressFormData, value: any) => {
     const newStops = [...formData.stops];
     newStops[stopIndex].address = { ...newStops[stopIndex].address, [field]: value };
+    setFormData({ ...formData, stops: newStops });
+  };
+
+  const updateStopAddressBulk = (stopIndex: number, addressUpdates: Partial<AddressFormData>) => {
+    const newStops = [...formData.stops];
+    newStops[stopIndex].address = { ...newStops[stopIndex].address, ...addressUpdates };
     setFormData({ ...formData, stops: newStops });
   };
 
@@ -179,6 +307,10 @@ export default function CreateOrderForm({ onClose, onSuccess }: CreateOrderFormP
     });
     setSearchCustomer('');
     setSearchEquipment('');
+    setSelectedCustomerName('');
+    setSelectedEquipmentName('');
+    setShowCustomerDropdown(false);
+    setShowEquipmentDropdown(false);
   };
 
   // Get locations for map
@@ -249,68 +381,88 @@ export default function CreateOrderForm({ onClose, onSuccess }: CreateOrderFormP
             
             <div className="grid grid-cols-2 gap-4">
               {/* Customer */}
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Customer <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="Search customers..."
-                  value={searchCustomer}
-                  onChange={(e) => setSearchCustomer(e.target.value)}
+                  placeholder="Type to search customers..."
+                  value={selectedCustomerName || searchCustomer}
+                  onChange={(e) => {
+                    setSearchCustomer(e.target.value);
+                    setSelectedCustomerName('');
+                    setFormData({ ...formData, customer_id: undefined });
+                  }}
+                  onFocus={() => setShowCustomerDropdown(true)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
-                {searchCustomer && (
-                  <div className="mt-1 max-h-40 overflow-y-auto border border-gray-200 rounded-lg bg-white shadow-lg">
-                    {customers
-                      .filter(c => c.name.toLowerCase().includes(searchCustomer.toLowerCase()))
-                      .map(customer => (
-                        <button
-                          key={customer.id}
-                          type="button"
-                          onClick={() => {
-                            setFormData({ ...formData, customer_id: customer.id });
-                            setSearchCustomer(customer.name);
-                          }}
-                          className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm"
-                        >
-                          {customer.name} ({customer.email})
-                        </button>
-                      ))}
+                {showCustomerDropdown && customers.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full max-h-60 overflow-y-auto border border-gray-200 rounded-lg bg-white shadow-lg">
+                    {customers.map(customer => (
+                      <button
+                        key={customer.id}
+                        type="button"
+                        onClick={() => {
+                          setFormData({ ...formData, customer_id: customer.id });
+                          setSelectedCustomerName(customer.name);
+                          setSearchCustomer('');
+                          setShowCustomerDropdown(false);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="font-medium text-gray-900">{customer.name}</div>
+                        <div className="text-xs text-gray-500">{customer.email}</div>
+                      </button>
+                    ))}
                   </div>
+                )}
+                {searchCustomer.length > 0 && searchCustomer.length < 2 && (
+                  <p className="text-xs text-gray-500 mt-1">Type at least 2 characters to search</p>
                 )}
               </div>
 
               {/* Equipment Type */}
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Equipment Type <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="Search equipment types..."
-                  value={searchEquipment}
-                  onChange={(e) => setSearchEquipment(e.target.value)}
+                  placeholder="Type to search equipment types..."
+                  value={selectedEquipmentName || searchEquipment}
+                  onChange={(e) => {
+                    setSearchEquipment(e.target.value);
+                    setSelectedEquipmentName('');
+                    setFormData({ ...formData, equipment_type_id: undefined });
+                  }}
+                  onFocus={() => setShowEquipmentDropdown(true)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
-                {searchEquipment && (
-                  <div className="mt-1 max-h-40 overflow-y-auto border border-gray-200 rounded-lg bg-white shadow-lg">
-                    {equipmentTypes
-                      .filter(e => e.name.toLowerCase().includes(searchEquipment.toLowerCase()))
-                      .map(equipment => (
-                        <button
-                          key={equipment.id}
-                          type="button"
-                          onClick={() => {
-                            setFormData({ ...formData, equipment_type_id: equipment.id });
-                            setSearchEquipment(equipment.name);
-                          }}
-                          className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm"
-                        >
-                          {equipment.name} {equipment.description && `- ${equipment.description}`}
-                        </button>
-                      ))}
+                {showEquipmentDropdown && equipmentTypes.length > 0 && (
+                  <div className="absolute z-10 mt-1 w-full max-h-60 overflow-y-auto border border-gray-200 rounded-lg bg-white shadow-lg">
+                    {equipmentTypes.map(equipment => (
+                      <button
+                        key={equipment.id}
+                        type="button"
+                        onClick={() => {
+                          setFormData({ ...formData, equipment_type_id: equipment.id });
+                          setSelectedEquipmentName(equipment.name);
+                          setSearchEquipment('');
+                          setShowEquipmentDropdown(false);
+                        }}
+                        className="w-full text-left px-3 py-2 hover:bg-blue-50 text-sm border-b border-gray-100 last:border-b-0"
+                      >
+                        <div className="font-medium text-gray-900">{equipment.name}</div>
+                        {equipment.description && (
+                          <div className="text-xs text-gray-500">{equipment.description}</div>
+                        )}
+                      </button>
+                    ))}
                   </div>
+                )}
+                {searchEquipment.length > 0 && searchEquipment.length < 2 && (
+                  <p className="text-xs text-gray-500 mt-1">Type at least 2 characters to search</p>
                 )}
               </div>
             </div>
@@ -374,6 +526,18 @@ export default function CreateOrderForm({ onClose, onSuccess }: CreateOrderFormP
                     )}
                   </div>
 
+                  {/* Address Autocomplete Search */}
+                  <div className="mb-3 pb-3 border-b border-purple-200">
+                    <AddressAutocomplete
+                      stopIndex={index}
+                      address={stop.address}
+                      onAddressUpdate={updateStopAddressBulk}
+                    />
+                    <p className="text-xs text-gray-500 mt-1 italic">
+                      💡 Tip: Search for an address above, or manually fill in the fields below
+                    </p>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
@@ -390,7 +554,7 @@ export default function CreateOrderForm({ onClose, onSuccess }: CreateOrderFormP
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Address <span className="text-red-500">*</span>
+                        Street Address <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
@@ -401,46 +565,63 @@ export default function CreateOrderForm({ onClose, onSuccess }: CreateOrderFormP
                         required
                       />
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        City <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="Enter city"
-                        value={stop.address.city}
-                        onChange={(e) => updateStopAddress(index, 'city', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
-                        required
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
-                          State <span className="text-red-500">*</span>
+                          ZIP Code <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="Enter ZIP"
+                            maxLength={10}
+                            value={stop.address.zip_code}
+                            onChange={(e) => updateStopAddress(index, 'zip_code', e.target.value)}
+                            onBlur={(e) => lookupZipCode(index, e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
+                            required
+                          />
+                          {zipLookupLoading[index] && (
+                            <div className="absolute right-2 top-2">
+                              <svg className="animate-spin h-4 w-4 text-purple-600" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Auto-fills city/state</p>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">
+                          City <span className="text-red-500">*</span>
                         </label>
                         <input
                           type="text"
-                          placeholder="XX"
-                          maxLength={2}
-                          value={stop.address.state}
-                          onChange={(e) => updateStopAddress(index, 'state', e.target.value.toUpperCase())}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
+                          placeholder="Auto-filled or enter"
+                          value={stop.address.city}
+                          onChange={(e) => updateStopAddress(index, 'city', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 bg-gray-50"
                           required
                         />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
-                          ZIP Code <span className="text-red-500">*</span>
+                          State <span className="text-red-500">*</span>
                         </label>
-                        <input
-                          type="text"
-                          placeholder="Enter ZIP code"
-                          value={stop.address.zip_code}
-                          onChange={(e) => updateStopAddress(index, 'zip_code', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
+                        <select
+                          value={stop.address.state}
+                          onChange={(e) => updateStopAddress(index, 'state', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 bg-white cursor-pointer"
                           required
-                        />
+                        >
+                          <option value="">Select State</option>
+                          {US_STATES.map(state => (
+                            <option key={state.code} value={state.code}>
+                              {state.code} - {state.name}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
                     <div>
