@@ -59,10 +59,10 @@ export default function LaneHistory({
         setError(null);
 
         const params = new URLSearchParams({
-          origin_city: originCity,
-          origin_state: originState,
-          dest_city: destCity,
-          dest_state: destState,
+          origin_city: originCity.toUpperCase(),
+          origin_state: originState.toUpperCase(),
+          dest_city: destCity.toUpperCase(),
+          dest_state: destState.toUpperCase(),
         });
 
         if (equipmentType) {

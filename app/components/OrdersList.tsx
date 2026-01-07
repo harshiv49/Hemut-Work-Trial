@@ -249,6 +249,16 @@ const OrdersList = forwardRef<OrdersListRef, OrdersListProps>(({
                     </div>
                   )}
 
+                  {/* Price Display */}
+                  <div className="mb-3 flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Price:</span>
+                    <span className="text-sm font-bold text-[#F4B223]">
+                      {order.quotation?.rate 
+                        ? `${order.quotation.currency || 'USD'} $${order.quotation.rate}`
+                        : 'TBD'}
+                    </span>
+                  </div>
+
                   {/* Route Information with connecting line */}
                   {(pickup || delivery) && (
                     <div className="relative">

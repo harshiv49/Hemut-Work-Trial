@@ -9,11 +9,11 @@ interface LaneCalculatorProps {
 }
 
 export default function LaneCalculator({
-  baseRate = 0,
+  baseRate,
   onCalculationChange,
 }: LaneCalculatorProps) {
   const [calculation, setCalculation] = useState<LaneCalculation>({
-    base_rate: baseRate,
+    base_rate: baseRate || 0,
     accessories: [],
     margin_percentage: 0,
     margin_amount: 0,
@@ -62,42 +62,51 @@ export default function LaneCalculator({
 
   const [marginPercentage, setMarginPercentage] = useState(0);
 
+  // Recalculate when base rate, accessories, or margin changes
   useEffect(() => {
-    recalculate();
-  }, [calculation.base_rate, calculation.accessories, marginPercentage]);
-
-  const recalculate = () => {
     try {
-      let subtotal = calculation.base_rate;
+      const baseRate = Number(calculation.base_rate) || 0;
+      let subtotal = baseRate;
 
       // Calculate accessories cost
       const accessoriesWithAmounts = calculation.accessories.map((acc) => {
+        const cost = Number(acc.cost) || 0;
         const calculatedAmount = acc.is_percentage
-          ? (calculation.base_rate * acc.cost) / 100
-          : acc.cost;
-        subtotal += calculatedAmount;
+          ? (baseRate * cost) / 100
+          : cost;
+        subtotal = subtotal + calculatedAmount;
         return { ...acc, calculated_amount: calculatedAmount };
       });
 
       // Calculate margin
-      const marginAmount = (subtotal * marginPercentage) / 100;
-      const total = subtotal + marginAmount;
+      const margin = Number(marginPercentage) || 0;
+      const marginAmount = Number(((subtotal * margin) / 100).toFixed(2));
+      const total = Number((subtotal + marginAmount).toFixed(2));
 
-      const newCalculation = {
-        base_rate: calculation.base_rate,
-        accessories: accessoriesWithAmounts,
-        margin_percentage: marginPercentage,
-        margin_amount: marginAmount,
-        subtotal,
-        total,
-      };
+      // Only update if values actually changed to prevent infinite loop
+      if (
+        calculation.subtotal !== subtotal ||
+        calculation.margin_amount !== marginAmount ||
+        calculation.total !== total ||
+        JSON.stringify(calculation.accessories) !== JSON.stringify(accessoriesWithAmounts)
+      ) {
+        const newCalculation = {
+          base_rate: baseRate,
+          accessories: accessoriesWithAmounts,
+          margin_percentage: margin,
+          margin_amount: marginAmount,
+          subtotal,
+          total,
+        };
 
-      setCalculation(newCalculation);
-      onCalculationChange?.(newCalculation);
+        setCalculation(newCalculation);
+        onCalculationChange?.(newCalculation);
+      }
     } catch (error) {
       console.error('Error calculating lane cost:', error);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calculation.base_rate, calculation.accessories.length, marginPercentage]);
 
   const toggleAccessory = (accessory: LaneAccessory) => {
     try {
@@ -156,7 +165,7 @@ export default function LaneCalculator({
         </h3>
         <input
           type="text"
-          value={calculation.base_rate || ''}
+          value={calculation.base_rate && calculation.base_rate > 0 ? calculation.base_rate : ''}
           onChange={(e) => {
             const value = e.target.value.replace(/[^0-9.]/g, '');
             setCalculation({
@@ -165,7 +174,7 @@ export default function LaneCalculator({
             });
           }}
           className="w-full px-4 py-3 bg-background border border-border rounded-lg text-lg font-semibold focus:ring-2 focus:ring-[#F4B223] focus:border-transparent text-foreground"
-          placeholder="0.00"
+          placeholder="TBD - Enter base rate"
         />
       </div>
 
@@ -281,9 +290,11 @@ export default function LaneCalculator({
         <div className="flex items-center gap-4">
           <input
             type="number"
-            step="0.1"
+            step="1"
+            min="0"
+            max="100"
             value={marginPercentage}
-            onChange={(e) => setMarginPercentage(parseFloat(e.target.value) || 0)}
+            onChange={(e) => setMarginPercentage(parseInt(e.target.value) || 0)}
             className="w-32 px-4 py-2 bg-background border border-border rounded-lg font-semibold focus:ring-2 focus:ring-[#F4B223] focus:border-transparent text-foreground"
             placeholder="0"
           />
@@ -302,33 +313,50 @@ export default function LaneCalculator({
         <div className="space-y-3">
           <div className="flex justify-between text-foreground">
             <span>Base Rate:</span>
-            <span className="font-semibold">${Number(calculation.base_rate || 0).toFixed(2)}</span>
+            <span className="font-semibold">
+              {!calculation.base_rate || calculation.base_rate === 0 
+                ? 'TBD' 
+                : `$${Number(calculation.base_rate).toFixed(2)}`}
+            </span>
           </div>
           {calculation.accessories.length > 0 && (
             <div className="flex justify-between text-foreground">
               <span>Accessories:</span>
               <span className="font-semibold">
-                $
-                {Number(
-                  calculation.accessories
-                    .reduce((sum, acc) => sum + (acc.calculated_amount || 0), 0)
-                ).toFixed(2)}
+                {!calculation.base_rate || calculation.base_rate === 0 
+                  ? 'TBD' 
+                  : `$${Number(
+                      calculation.accessories
+                        .reduce((sum, acc) => sum + (acc.calculated_amount || 0), 0)
+                    ).toFixed(2)}`}
               </span>
             </div>
           )}
           <div className="flex justify-between text-foreground border-t border-[#F4B223]/30 pt-2">
             <span>Subtotal:</span>
-            <span className="font-semibold">${Number(calculation.subtotal || 0).toFixed(2)}</span>
+            <span className="font-semibold">
+              {!calculation.base_rate || calculation.base_rate === 0 
+                ? 'TBD' 
+                : `$${Number(calculation.subtotal).toFixed(2)}`}
+            </span>
           </div>
           {calculation.margin_percentage > 0 && (
             <div className="flex justify-between text-foreground">
               <span>Margin ({calculation.margin_percentage}%):</span>
-              <span className="font-semibold">${Number(calculation.margin_amount || 0).toFixed(2)}</span>
+              <span className="font-semibold">
+                {!calculation.base_rate || calculation.base_rate === 0 
+                  ? 'TBD' 
+                  : `$${Number(calculation.margin_amount).toFixed(2)}`}
+              </span>
             </div>
           )}
           <div className="flex justify-between text-2xl font-bold text-foreground border-t-2 border-[#F4B223] pt-3">
             <span>Total:</span>
-            <span className="text-[#F4B223]">${Number(calculation.total || 0).toFixed(2)}</span>
+            <span className="text-[#F4B223]">
+              {!calculation.base_rate || calculation.base_rate === 0 
+                ? 'TBD' 
+                : `$${Number(calculation.total).toFixed(2)}`}
+            </span>
           </div>
         </div>
       </div>

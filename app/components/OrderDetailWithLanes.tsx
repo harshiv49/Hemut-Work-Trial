@@ -87,7 +87,9 @@ export default function OrderDetailWithLanes({ order }: OrderDetailWithLanesProp
                 <div>
                   <div className="text-sm text-muted-foreground">Rate</div>
                   <div className="text-lg font-semibold text-foreground">
-                    ${order.quotation?.rate?.toFixed(2) || '0.00'}
+                    {order.quotation?.rate != null
+                      ? `$${order.quotation.rate.toFixed(2)}` 
+                      : 'TBD'}
                   </div>
                 </div>
               </div>
@@ -149,10 +151,10 @@ export default function OrderDetailWithLanes({ order }: OrderDetailWithLanesProp
                   />
                 </svg>
               </div>
-              Lane Calculator
+             Billing Calculator
             </h3>
             <LaneCalculator
-              baseRate={order.quotation?.rate || 0}
+              baseRate={order.quotation?.rate ?? undefined}
               onCalculationChange={setLaneCalculation}
             />
             

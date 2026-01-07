@@ -230,6 +230,28 @@ export default function OrderDetail({ orderId }: { orderId: number | null }) {
         <div className={`p-3 sm:p-6 bg-card overflow-y-auto transition-all duration-300 ease-in-out ${showMap ? 'h-1/2 md:h-1/2' : 'h-full'}`}>
         {activeTab === 'load' && (
           <div className="space-y-6">
+            {/* Price Summary Card */}
+            <div className="bg-gradient-to-r from-[#F4B223]/10 to-[#F4B223]/5 rounded-lg border border-[#F4B223]/20 p-4 sm:p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">Order Price</h3>
+                  <p className="text-2xl sm:text-3xl font-bold text-[#F4B223]">
+                    {order.quotation?.rate 
+                      ? `${order.quotation.currency || 'USD'} $${Number(order.quotation.rate).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      : 'TBD'}
+                  </p>
+                  {!order.quotation?.rate && (
+                    <p className="text-xs text-muted-foreground mt-1">Price to be determined</p>
+                  )}
+                </div>
+                <div className="bg-[#F4B223] text-gray-900 rounded-full p-3 sm:p-4">
+                  <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
             <div className="bg-background rounded-lg border border-border p-3 sm:p-5">
               <h3 className="text-sm font-semibold text-foreground mb-4">Load Information</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-8 gap-y-4">
@@ -474,10 +496,10 @@ export default function OrderDetail({ orderId }: { orderId: number | null }) {
                   />
                 </svg>
               </div>
-              Lane Calculator
+              Billing Calculator
             </h3>
             <LaneCalculator
-              baseRate={order.quotation?.rate || 0}
+              baseRate={order.quotation?.rate ?? undefined}
               onCalculationChange={setLaneCalculation}
             />
             
